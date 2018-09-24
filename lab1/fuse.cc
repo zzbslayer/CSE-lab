@@ -58,6 +58,18 @@ getattr(yfs_client::inum inum, struct stat &st)
         st.st_ctime = info.ctime;
         st.st_size = info.size;
         printf("   getattr -> %llu\n", info.size);
+    } else if (yfs->issymlink(inum)){
+        yfs_client::symlinkinfo info;
+        ret = yfs->getsymlink(inum, info);
+        if(ret != yfs_client::OK)
+            return ret;
+        st.st_mode = S_IFLNK | 0777;
+        st.st_nlink = 1;
+        st.st_size = info.size;
+        st.st_atime = info.atime;
+        st.st_mtime = info.mtime;
+        st.st_ctime = info.ctime;
+        printf("   getattr -> %llu\n", info.size);
     } else {
         yfs_client::dirinfo info;
         ret = yfs->getdir(inum, info);
@@ -92,6 +104,7 @@ void
 fuseserver_getattr(fuse_req_t req, fuse_ino_t ino,
         struct fuse_file_info *fi)
 {
+    printf("FUSESERVER_GETATTR:\n");
     struct stat st;
     yfs_client::inum inum = ino; // req->in.h.nodeid;
     yfs_client::status ret;
@@ -159,13 +172,16 @@ void
 fuseserver_read(fuse_req_t req, fuse_ino_t ino, size_t size,
         off_t off, struct fuse_file_info *fi)
 {
+    printf("FUSESERVER_READ:\n");
 #if 1
     std::string buf;
     // Change the above "#if 0" to "#if 1", and your code goes here
     int r;
     if ((r = yfs->read(ino, size, off, buf)) == yfs_client::OK) {
+        printf("\tFUSESERVER_READ: OK\n");
         fuse_reply_buf(req, buf.data(), buf.size());    
     } else {
+        printf("\tFUSESERVER_READ: ENOENT ERROR\n");
         fuse_reply_err(req, ENOENT);
     }
 #else
@@ -195,12 +211,15 @@ fuseserver_write(fuse_req_t req, fuse_ino_t ino,
         const char *buf, size_t size, off_t off,
         struct fuse_file_info *fi)
 {
+    printf("FUSESERVER_WRITE:\n");
 #if 1
     // Change the above line to "#if 1", and your code goes here
     int r;
     if ((r = yfs->write(ino, size, off, buf, size)) == yfs_client::OK) {
+        printf("\tFUSESERVER_WRITE: OK\n");
         fuse_reply_write(req, size);
     } else {
+        printf("\tFUSESERVER_WRITE: ENOENT ERROR\n");
         fuse_reply_err(req, ENOENT);
     }
 #else
@@ -230,6 +249,7 @@ yfs_client::status
 fuseserver_createhelper(fuse_ino_t parent, const char *name,
         mode_t mode, struct fuse_entry_param *e, int type)
 {
+    printf("FUSESERVER_CREATEHELPER:\n");
     int ret;
     // In yfs, timeouts are always set to 0.0, and generations are always set to 0
     e->attr_timeout = 0.0;
@@ -254,13 +274,16 @@ fuseserver_create(fuse_req_t req, fuse_ino_t parent, const char *name,
 {
     struct fuse_entry_param e;
     yfs_client::status ret;
+    printf( "FUSESERVER_CREATE: \n");
     if( (ret = fuseserver_createhelper( parent, name, mode, &e, extent_protocol::T_FILE)) == yfs_client::OK ) {
         fuse_reply_create(req, &e, fi);
         printf("OK: create returns.\n");
     } else {
         if (ret == yfs_client::EXIST) {
+            printf( "\tFUSESERVER_CREATE: EEXIST ERROR\n");
             fuse_reply_err(req, EEXIST);
         }else{
+            printf("\tFUSESERVER_CREATE: ENOENT ERROR\n");
             fuse_reply_err(req, ENOENT);
         }
     }
@@ -270,12 +293,16 @@ void fuseserver_mknod( fuse_req_t req, fuse_ino_t parent,
         const char *name, mode_t mode, dev_t rdev ) {
     struct fuse_entry_param e;
     yfs_client::status ret;
+    printf( "FUSESERVER_MKNOD: \n");
     if( (ret = fuseserver_createhelper( parent, name, mode, &e, extent_protocol::T_FILE)) == yfs_client::OK ) {
         fuse_reply_entry(req, &e);
+        printf("OK: mknod returns.\n");
     } else {
         if (ret == yfs_client::EXIST) {
+            printf("\tFUSESERVER_MKNOD: EEXIST ERROR\n");
             fuse_reply_err(req, EEXIST);
         }else{
+            printf("\tFUSESERVER_MKNOD: ENOENT ERROR\n");
             fuse_reply_err(req, ENOENT);
         }
     }
@@ -289,6 +316,7 @@ void fuseserver_mknod( fuse_req_t req, fuse_ino_t parent,
 void
 fuseserver_lookup(fuse_req_t req, fuse_ino_t parent, const char *name)
 {
+    printf("FUSESERVER_LOOKUP:\n");
     struct fuse_entry_param e;
     // In yfs, timeouts are always set to 0.0, and generations are always set to 0
     e.attr_timeout = 0.0;
@@ -350,6 +378,7 @@ void
 fuseserver_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
         off_t off, struct fuse_file_info *fi)
 {
+    printf("FUSESERVER_READDIR:\n");
     yfs_client::inum inum = ino; // req->in.h.nodeid;
     struct dirbuf b;
 
@@ -377,7 +406,9 @@ void
 fuseserver_open(fuse_req_t req, fuse_ino_t ino,
         struct fuse_file_info *fi)
 {
+    printf("FUSESERVER_OPEN:\n");
     fuse_reply_open(req, fi);
+    printf("END of FUSESERVER_OPEN:\n");
 }
 
 //
@@ -394,6 +425,7 @@ void
 fuseserver_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name,
         mode_t mode)
 {
+    printf("FUSESERVER_MKDIR:\n");
     struct fuse_entry_param e;
     // In yfs, timeouts are always set to 0.0, and generations are always set to 0
     e.attr_timeout = 0.0;
@@ -430,6 +462,7 @@ fuseserver_mkdir(fuse_req_t req, fuse_ino_t parent, const char *name,
 void
 fuseserver_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
 {
+    printf("FUSESERVER_UNLINK:\n");
     int r;
     if ((r = yfs->unlink(parent, name)) == yfs_client::OK) {
         fuse_reply_err(req, 0);
@@ -445,6 +478,7 @@ fuseserver_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
 void
 fuseserver_statfs(fuse_req_t req)
 {
+    printf("FUSESERVER_STATFS:\n");
     struct statvfs buf;
 
     printf("statfs\n");
@@ -455,6 +489,51 @@ fuseserver_statfs(fuse_req_t req)
     buf.f_bsize = 512;
 
     fuse_reply_statfs(req, &buf);
+}
+
+void
+fuseserver_symlink(fuse_req_t req, const char *link, fuse_ino_t parent, const char *name)
+{
+    int r;
+    yfs_client::inum ino;
+    if ((r = yfs->symlink(link, parent, name, ino)) == yfs_client::OK) {
+        struct fuse_entry_param e;
+        e.ino = ino;
+        // In yfs, timeouts are always set to 0.0, and generations are always set to 0
+        e.attr_timeout = 0.0;
+        e.entry_timeout = 0.0;
+        e.generation = 0;
+        getattr(ino, e.attr);
+        fuse_reply_entry(req, &e);
+    } else {
+        if (r == yfs_client::NOENT) {
+            fuse_reply_err(req, ENOENT);
+        } 
+        else if (r == yfs_client::EXIST){
+            fuse_reply_err(req, EEXIST);
+        }
+        else {
+            fuse_reply_err(req, ENOTEMPTY);
+        }
+    }
+}
+
+void
+fuseserver_readlink(fuse_req_t req, fuse_ino_t ino)
+{
+    int r;
+    std::string link;
+    if ((r = yfs->readlink(ino, link)) == yfs_client::OK) {
+        printf("\tFUSESERVER_READLINK: OK\n");
+        fuse_reply_readlink(req, link.data());
+    } else {
+        printf("\tFUSESERVER_READLINK: ERROR\n");
+        if (r == yfs_client::NOENT) {
+            fuse_reply_err(req, ENOENT);
+        } else {
+            fuse_reply_err(req, ENOTEMPTY);
+        }
+    }
 }
 
 struct fuse_lowlevel_ops fuseserver_oper;
@@ -499,6 +578,8 @@ main(int argc, char *argv[])
     fuseserver_oper.setattr    = fuseserver_setattr;
     fuseserver_oper.unlink     = fuseserver_unlink;
     fuseserver_oper.mkdir      = fuseserver_mkdir;
+    fuseserver_oper.symlink    = fuseserver_symlink;
+    fuseserver_oper.readlink   = fuseserver_readlink;
     /** Your code here for Lab.
      * you may want to add
      * routines here to implement symbolic link,
