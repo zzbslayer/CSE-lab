@@ -189,7 +189,7 @@ yfs_client::setattr(inum ino, size_t size)
 int
 yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out)
 {
-    fprintf(stderr, "YFS create name: %s\n", name);
+    printf("YFS create name: %s\n", name);
     int r = OK;
     bool found = false;
     lookup(parent, name, found, ino_out);
@@ -338,7 +338,10 @@ yfs_client::write(inum ino, size_t size, off_t off, const char *data,
     r = ec->get(ino, content);
     int len = content.size();
 
-    std::string sdata = std::string(data);
+    //std::string sdata = std::string(data);
+    std::string sdata(size, 0);
+    for (int i = 0; i < size; i++)
+        sdata[i] = data[i];
     sdata = sdata.substr(0, size);
     if (len < off){
         int gap = off - len;
